@@ -1,0 +1,90 @@
+:root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+body { margin: 0; background: #0b0c10; color: #eaf0f6; }
+.container { max-width: 680px; margin: 3rem auto; padding: 0 1rem; }
+h1 { margin-bottom: .5rem; }
+p { color: #c5d1de; }
+
+.dropzone {
+  border: 2px dashed #3a506b;
+  border-radius: 12px;
+  padding: 2rem;
+  background: #1f2833;
+  display: grid;
+  place-items: center;
+  transition: border-color .2s ease, background .2s ease;
+  margin-bottom: 1rem;
+}
+.dropzone.highlight {
+  border-color: #66fcf1;
+  background: #162029;
+}
+#dz-instructions { text-align: center; }
+#dz-instructions strong { display: block; margin-bottom: .5rem; }
+#dz-instructions button {
+  all: unset;
+  padding: .5rem .75rem;
+  border-radius: 8px;
+  background: #45a29e;
+  color: #0b0c10;
+  cursor: pointer;
+  font-weight: 600;
+}
+#dz-instructions button:hover { filter: brightness(1.1); }
+.filename { margin-top: .5rem; color: #9fb3c8; }
+
+label { display:block; margin: .75rem 0 .25rem; }
+select {
+  width: 100%;
+  padding: .5rem;
+  border-radius: 8px;
+  border: 1px solid #2b3945;
+  background: #12161c;
+  color: #eaf0f6;
+}
+.btn {
+  margin-top: 1rem;
+  width: 100%;
+  padding: .75rem;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #66fcf1, #45a29e);
+  color: #0b0c10;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn:disabled { opacity: .7; cursor: not-allowed; }
+footer { margin-top: 2rem; color: #8aa1b2; }
+code { background: #0f1319; padding: .1rem .3rem; border-radius: 6px; }
+
+
+.hidden { display: none; }
+.bar-wrap {
+  width: 100%;
+  background: #0f1319;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 1rem;
+  border: 1px solid #2b3945;
+}
+.bar {
+  height: 14px;
+  background: linear-gradient(90deg, #66fcf1, #45a29e);
+  width: 0%;
+  transition: width .2s ease;
+}
+.bar-text { margin-top: .25rem; color: #9fb3c8; font-variant-numeric: tabular-nums; }
+.logs { margin-top: 1rem; }
+.logs pre {
+  background: #0f1319;
+  border: 1px solid #2b3945;
+  border-radius: 8px;
+  padding: .75rem;
+  max-height: 240px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.gpu-row { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; }
