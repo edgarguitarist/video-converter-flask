@@ -46,12 +46,48 @@
           <option value="avi">AVI (MPEG-4)</option>
           <option value="mkv">MKV (H.264/HEVC)</option>
           <option value="mp3">MP3 (Audio solamente)</option>
+          <option value="srt">SRT (Subtítulos con IA)</option>
         </select>
 
         <label class="gpu-row">
           <input type="checkbox" id="gpu" name="gpu" checked />
           <span>Usar GPU (NVENC/AV1) — recomendado con RTX 40xx</span>
         </label>
+
+        <!-- Opciones para Subtítulos -->
+        <div id="srt-options" class="srt-options hidden">
+          <label for="whisper-model"
+            >Modelo Whisper (precisión vs velocidad)</label
+          >
+          <select id="whisper-model" name="whisper_model">
+            <option value="tiny">Tiny (más rápido, menos preciso)</option>
+            <option value="base" selected>Base (balance)</option>
+            <option value="small">Small (más preciso)</option>
+            <option value="medium">Medium (muy preciso)</option>
+            <option value="large">Large (máxima precisión)</option>
+          </select>
+
+          <label for="translate-language">Traducir subtítulos (opcional)</label>
+          <select id="translate-language" name="translate_language">
+            <option value="">Sin traducción (solo idioma original)</option>
+            <option value="english">Inglés</option>
+            <option value="spanish">Español</option>
+            <option value="french">Francés</option>
+            <option value="german">Alemán</option>
+            <option value="portuguese">Portugués</option>
+            <option value="italian">Italiano</option>
+            <option value="chinese">Chino</option>
+            <option value="japanese">Japonés</option>
+            <option value="korean">Coreano</option>
+            <option value="russian">Ruso</option>
+            <option value="arabic">Árabe</option>
+            <option value="hindi">Hindi</option>
+          </select>
+          <small class="help-text"
+            >Si seleccionas traducción, obtendrás 2 archivos SRT: original +
+            traducido</small
+          >
+        </div>
 
         <button class="btn" type="submit">Convertir</button>
       </form>

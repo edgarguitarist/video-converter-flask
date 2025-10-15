@@ -1,17 +1,27 @@
 
-import os, re, json, uuid, subprocess, threading, queue, time, argparse, sys
+import os, re, json, uuid, subprocess, threading, queue, time, argparse, sys, warnings
 from datetime import datetime, timedelta
 from pathlib import Path
 from flask import Flask, render_template, request, send_file, abort, Response, jsonify, url_for
 from werkzeug.utils import secure_filename
 
+# Suprimir warning específico de Whisper sobre FP16/FP32
+warnings.filterwarnings("ignore", message="FP16 is not supported on CPU; using FP32 instead")
+
 # Importación condicional de Whisper
 try:
     import whisper
+    import torch
     WHISPER_AVAILABLE = True
+    # Detectar si hay GPU disponible
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    COMPUTE_TYPE = "float16" if DEVICE == "cuda" else "float32"
 except ImportError:
     WHISPER_AVAILABLE = False
     whisper = None
+    torch = None
+    DEVICE = "cpu"
+    COMPUTE_TYPE = "float32"
 
 # Importación condicional de deep-translator
 try:
@@ -23,6 +33,126 @@ except ImportError:
 
 ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.mkv', '.avi', '.wmv', '.flv', '.webm', '.m4v'}
 MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # 2GB
+
+def print_whisper_info():
+    """Muestra información sobre la configuración de Whisper"""
+    if WHISPER_AVAILABLE:
+        print(f"✅ Whisper disponible")
+        print(f"🖥️  Dispositivo: {DEVICE.upper()}")
+        print(f"🔢 Precisión: {COMPUTE_TYPE}")
+        if torch and torch.cuda.is_available():
+            print(f"🚀 GPU detectada: {torch.cuda.get_device_name(0)}")
+    else:
+        print("❌ Whisper no disponible. Instala con: pip install openai-whisper")
+
+def get_audio_info(audio_path: str):
+    """Obtiene información del archivo de audio"""
+    try:
+        import subprocess
+        cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', audio_path]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        info = json.loads(result.stdout)
+        
+        # Buscar stream de audio
+        audio_stream = None
+        for stream in info.get('streams', []):
+            if stream.get('codec_type') == 'audio':
+                audio_stream = stream
+                break
+        
+        if audio_stream:
+            duration = float(info.get('format', {}).get('duration', 0))
+            bitrate = int(info.get('format', {}).get('bit_rate', 0))
+            sample_rate = int(audio_stream.get('sample_rate', 0))
+            channels = int(audio_stream.get('channels', 0))
+            
+            print(f"📊 Información del audio:")
+            print(f"   ⏱️  Duración: {duration:.1f} segundos ({duration/60:.1f} minutos)")
+            print(f"   🎛️  Bitrate: {bitrate//1000} kbps")
+            print(f"   📻 Sample rate: {sample_rate} Hz")
+            print(f"   🔊 Canales: {channels}")
+            
+            # Estimación de tiempo de procesamiento
+            if duration > 0:
+                # Whisper procesa aprox 10-20x más lento que tiempo real en CPU
+                multiplier = 15 if DEVICE == "cpu" else 5  # GPU es más rápida
+                estimated_time = duration * multiplier
+                print(f"   ⏰ Tiempo estimado: {estimated_time/60:.1f} minutos")
+            
+            return duration
+    except Exception as e:
+        print(f"⚠️  No se pudo obtener info del audio: {e}")
+        return None
+
+def transcribe_with_progress(model, audio_path: str, timeout_minutes=30, **kwargs):
+    """Wrapper de transcripción con progreso mejorado y timeout"""
+    import time
+    import threading
+    import signal
+    
+    # Variable para controlar el progreso
+    progress_active = True
+    start_time = time.time()
+    result = None
+    error = None
+    
+    def show_progress():
+        dots = 0
+        while progress_active:
+            elapsed = time.time() - start_time
+            mins, secs = divmod(int(elapsed), 60)
+            dots_str = "." * (dots % 4)
+            
+            # Mostrar warning si está tomando mucho tiempo
+            if elapsed > 300:  # 5 minutos
+                print(f"\r   ⏳ Transcribiendo{dots_str:<3} | Tiempo: {mins:02d}:{secs:02d} ⚠️  Tomando mucho tiempo...", end="", flush=True)
+            else:
+                print(f"\r   ⏳ Transcribiendo{dots_str:<3} | Tiempo: {mins:02d}:{secs:02d}", end="", flush=True)
+            
+            dots += 1
+            time.sleep(1)
+    
+    def transcribe_worker():
+        nonlocal result, error
+        try:
+            result = model.transcribe(audio_path, **kwargs)
+        except Exception as e:
+            error = e
+    
+    # Iniciar hilos
+    progress_thread = threading.Thread(target=show_progress, daemon=True)
+    worker_thread = threading.Thread(target=transcribe_worker, daemon=True)
+    
+    progress_thread.start()
+    worker_thread.start()
+    
+    # Esperar con timeout
+    worker_thread.join(timeout=timeout_minutes * 60)
+    progress_active = False
+    
+    if worker_thread.is_alive():
+        elapsed = time.time() - start_time
+        mins, secs = divmod(int(elapsed), 60)
+        print(f"\r   ⏰ TIMEOUT después de {mins:02d}:{secs:02d} - La transcripción está tomando demasiado tiempo")
+        print("💡 Sugerencias:")
+        print("   - Usa un modelo más pequeño (tiny o base)")
+        print("   - Verifica que el archivo de audio no esté corrupto")
+        print("   - Considera dividir el archivo en partes más pequeñas")
+        raise TimeoutError(f"Transcripción cancelada después de {timeout_minutes} minutos")
+    
+    if error:
+        elapsed = time.time() - start_time
+        mins, secs = divmod(int(elapsed), 60)
+        print(f"\r   ❌ Error en transcripción después de {mins:02d}:{secs:02d}: {error}")
+        raise error
+    
+    if result:
+        elapsed = time.time() - start_time
+        mins, secs = divmod(int(elapsed), 60)
+        print(f"\r   ✅ Transcripción completada en {mins:02d}:{secs:02d}          ")
+        return result
+    else:
+        raise Exception("No se obtuvo resultado de la transcripción")
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'uploads')
@@ -66,12 +196,25 @@ def transcribe_audio_to_srt(audio_path: str, output_srt_path: str, model_size: s
         print(f"❌ ERROR: Archivo de audio no encontrado: {audio_path}")
         return False
     
+    # Verificar tamaño del archivo
+    file_size = os.path.getsize(audio_path) / (1024 * 1024)  # MB
+    print(f"📁 Tamaño del archivo: {file_size:.1f} MB")
+    
+    if file_size > 100:  # Archivo muy grande
+        print("⚠️  ARCHIVO GRANDE detectado. Esto puede tomar mucho tiempo.")
+        print("💡 Sugerencia: Usa modelo 'tiny' o 'base' para archivos grandes")
+        if model_size in ['large', 'medium']:
+            print(f"⚠️  Modelo '{model_size}' puede ser muy lento para este archivo")
+    
     try:
-        print(f"🤖 Cargando modelo Whisper ({model_size})...")
-        model = whisper.load_model(model_size)
+        print(f"🤖 Cargando modelo Whisper ({model_size}) en {DEVICE.upper()}...")
+        model = whisper.load_model(model_size, device=DEVICE)
         
-        print(f"🎵 Transcribiendo audio: {audio_path}")
-        result = model.transcribe(audio_path, word_timestamps=True)
+        # Mostrar información del archivo
+        duration = get_audio_info(audio_path)
+        
+        print(f"🎵 Iniciando transcripción...")
+        result = transcribe_with_progress(model, audio_path, word_timestamps=True, fp16=(DEVICE == "cuda"))
         
         print(f"📄 Generando archivo SRT: {output_srt_path}")
         
@@ -163,12 +306,25 @@ def transcribe_and_translate_to_srt(audio_path: str, output_srt_path: str, targe
         print(f"❌ ERROR: Archivo de audio no encontrado: {audio_path}")
         return False
     
+    # Verificar tamaño del archivo
+    file_size = os.path.getsize(audio_path) / (1024 * 1024)  # MB
+    print(f"📁 Tamaño del archivo: {file_size:.1f} MB")
+    
+    if file_size > 100:  # Archivo muy grande
+        print("⚠️  ARCHIVO GRANDE detectado. Esto puede tomar mucho tiempo.")
+        print("💡 Sugerencia: Usa modelo 'tiny' o 'base' para archivos grandes")
+        if model_size in ['large', 'medium']:
+            print(f"⚠️  Modelo '{model_size}' puede ser muy lento para este archivo")
+    
     try:
-        print(f"🤖 Cargando modelo Whisper ({model_size})...")
-        model = whisper.load_model(model_size)
+        print(f"🤖 Cargando modelo Whisper ({model_size}) en {DEVICE.upper()}...")
+        model = whisper.load_model(model_size, device=DEVICE)
         
-        print(f"🎵 Transcribiendo audio: {audio_path}")
-        result = model.transcribe(audio_path, word_timestamps=True)
+        # Mostrar información del archivo
+        duration = get_audio_info(audio_path)
+        
+        print(f"🎵 Iniciando transcripción...")
+        result = transcribe_with_progress(model, audio_path, word_timestamps=True, fp16=(DEVICE == "cuda"))
         
         # Crear rutas para ambos archivos SRT
         original_srt_path = output_srt_path
@@ -372,6 +528,41 @@ def sse_format(event: str = None, data: str = "") -> str:
         chunks.append(f"data: {line}")
     return "\n".join(chunks) + "\n\n"
 
+def generate_srt_from_result(whisper_result, output_path: str):
+    """Genera archivo SRT desde resultado de Whisper"""
+    with open(output_path, 'w', encoding='utf-8') as f:
+        for i, segment in enumerate(whisper_result['segments'], 1):
+            start_time = seconds_to_srt_time(segment['start'])
+            end_time = seconds_to_srt_time(segment['end'])
+            text = segment['text'].strip()
+            
+            f.write(f"{i}\n")
+            f.write(f"{start_time} --> {end_time}\n")
+            f.write(f"{text}\n\n")
+
+def translate_and_generate_srt(whisper_result, output_path: str, target_language: str):
+    """Traduce el resultado de Whisper y genera SRT traducido"""
+    if not TRANSLATOR_AVAILABLE:
+        raise Exception("Traductor no disponible. Instala: pip install deep-translator")
+    
+    translator = GoogleTranslator(target=target_language)
+    
+    with open(output_path, 'w', encoding='utf-8') as f:
+        for i, segment in enumerate(whisper_result['segments'], 1):
+            start_time = seconds_to_srt_time(segment['start'])
+            end_time = seconds_to_srt_time(segment['end'])
+            
+            # Traducir el texto
+            original_text = segment['text'].strip()
+            try:
+                translated_text = translator.translate(original_text)
+            except Exception:
+                translated_text = original_text  # Fallback al texto original
+            
+            f.write(f"{i}\n")
+            f.write(f"{start_time} --> {end_time}\n")
+            f.write(f"{translated_text}\n\n")
+
 @app.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
@@ -384,7 +575,7 @@ def convert():
     target_format = request.form.get('format', '').lower().strip()
     use_gpu = request.form.get('gpu', 'off') == 'on'
 
-    if target_format not in {'mp4','webm','avi','mkv','mp3'}:
+    if target_format not in {'mp4','webm','avi','mkv','mp3','srt'}:
         abort(400, "Formato objetivo inválido.")
     if f.filename == '':
         abort(400, "Nombre de archivo vacío.")
@@ -399,11 +590,31 @@ def convert():
     f.save(input_path)
 
     base_name = Path(orig_name).stem
-    out_name = f"{base_name}-{ts}.{target_format}"
-    output_path = os.path.join(app.config['CONVERTED_FOLDER'], out_name)
+    
+    # Manejar formato SRT (subtítulos)
+    if target_format == 'srt':
+        if not WHISPER_AVAILABLE:
+            abort(400, "Whisper no está disponible. Instala: pip install openai-whisper")
+        
+        whisper_model = request.form.get('whisper_model', 'base')
+        translate_language = request.form.get('translate_language', '').strip()
+        
+        # Para SRT, el output puede ser múltiple si hay traducción
+        if translate_language:
+            out_name = f"{base_name}-{ts}.zip"  # ZIP con ambos SRT
+            output_path = os.path.join(app.config['CONVERTED_FOLDER'], out_name)
+        else:
+            out_name = f"{base_name}-{ts}.srt"
+            output_path = os.path.join(app.config['CONVERTED_FOLDER'], out_name)
+    else:
+        out_name = f"{base_name}-{ts}.{target_format}"
+        output_path = os.path.join(app.config['CONVERTED_FOLDER'], out_name)
 
-    # Obtener argumentos de codec
-    codec_args, chosen_encoder = get_codec_args(target_format, use_gpu)
+    # Obtener argumentos de codec (solo para formatos de video/audio)
+    if target_format != 'srt':
+        codec_args, chosen_encoder = get_codec_args(target_format, use_gpu)
+    else:
+        codec_args, chosen_encoder = [], None
 
     # Precalcular duración para porcentaje
     duration = ffprobe_duration(input_path)
@@ -419,43 +630,109 @@ def convert():
         'error': None
     }
 
-    # Ejecutar ffmpeg en hilo aparte y enviar logs a la cola
-    def run_ffmpeg():
-        # Log inicial
+    # Ejecutar conversión en hilo aparte
+    def run_conversion():
         try:
-            jobs[job_id]['log'].put_nowait(f"Destino: .{target_format}  | GPU: {'Sí' if use_gpu else 'No'}  | Encoder: {chosen_encoder or 'CPU'}")
-        except Exception:
-            pass
-        cmd = ['ffmpeg','-hide_banner','-y','-i', input_path, *codec_args, output_path]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
-        time_re = re.compile(r'time=(\d+):(\d+):(\d+(\.\d+)?)')
-        try:
-            for line in proc.stderr:
-                # Encolar línea
-                try: jobs[job_id]['log'].put_nowait(line.rstrip())
-                except queue.Full: pass
-                # Extraer tiempo
-                m = time_re.search(line)
-                if m and duration > 0:
-                    hh, mm, ss = int(m.group(1)), int(m.group(2)), float(m.group(3))
-                    cur = hh*3600 + mm*60 + ss
-                    pct = max(0.0, min(100.0, (cur/duration)*100.0))
-                    jobs[job_id]['progress'] = pct
-            ret = proc.wait()
-            # limpieza del archivo subido
+            if target_format == 'srt':
+                # Procesamiento de subtítulos con IA
+                whisper_model = request.form.get('whisper_model', 'base')
+                translate_language = request.form.get('translate_language', '').strip()
+                
+                jobs[job_id]['log'].put_nowait(f"🤖 Iniciando transcripción con IA...")
+                jobs[job_id]['log'].put_nowait(f"Modelo Whisper: {whisper_model}")
+                if translate_language:
+                    jobs[job_id]['log'].put_nowait(f"Traducción a: {translate_language}")
+                
+                # Paso 1: Extraer audio MP3
+                jobs[job_id]['log'].put_nowait("📂 Extrayendo audio...")
+                jobs[job_id]['progress'] = 10.0
+                
+                mp3_path = input_path.replace(Path(input_path).suffix, '.mp3')
+                mp3_cmd = ['ffmpeg', '-hide_banner', '-y', '-i', input_path, '-q:a', '0', '-map', 'a', mp3_path]
+                subprocess.run(mp3_cmd, check=True, capture_output=True)
+                
+                # Paso 2: Transcribir con Whisper
+                jobs[job_id]['log'].put_nowait(f"🎧 Transcribiendo audio con IA en {DEVICE.upper()}...")
+                jobs[job_id]['progress'] = 30.0
+                
+                model = whisper.load_model(whisper_model, device=DEVICE)
+                result = model.transcribe(mp3_path, fp16=(DEVICE == "cuda"))
+                
+                jobs[job_id]['progress'] = 70.0
+                
+                # Paso 3: Generar SRT
+                if translate_language:
+                    jobs[job_id]['log'].put_nowait("🌍 Generando subtítulos con traducción...")
+                    import zipfile
+                    
+                    # Generar SRT original
+                    original_srt = output_path.replace('.zip', '_original.srt')
+                    generate_srt_from_result(result, original_srt)
+                    
+                    # Traducir y generar SRT traducido
+                    translated_srt = output_path.replace('.zip', f'_{translate_language}.srt')
+                    translate_and_generate_srt(result, translated_srt, translate_language)
+                    
+                    # Crear ZIP con ambos SRT
+                    with zipfile.ZipFile(output_path, 'w') as zipf:
+                        zipf.write(original_srt, f"{base_name}_original.srt")
+                        zipf.write(translated_srt, f"{base_name}_{translate_language}.srt")
+                    
+                    # Limpiar archivos temporales
+                    os.remove(original_srt)
+                    os.remove(translated_srt)
+                    
+                    jobs[job_id]['log'].put_nowait(f"✅ Creado ZIP con SRT original + {translate_language}")
+                else:
+                    jobs[job_id]['log'].put_nowait("📝 Generando archivo SRT...")
+                    generate_srt_from_result(result, output_path)
+                    jobs[job_id]['log'].put_nowait("✅ Subtítulos generados exitosamente")
+                
+                # Limpiar MP3 temporal
+                os.remove(mp3_path)
+                jobs[job_id]['progress'] = 100.0
+                
+            else:
+                # Conversión de video/audio con ffmpeg
+                jobs[job_id]['log'].put_nowait(f"Destino: .{target_format}  | GPU: {'Sí' if use_gpu else 'No'}  | Encoder: {chosen_encoder or 'CPU'}")
+                
+                cmd = ['ffmpeg','-hide_banner','-y','-i', input_path, *codec_args, output_path]
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+                time_re = re.compile(r'time=(\d+):(\d+):(\d+(\.\d+)?)')
+                
+                for line in proc.stderr:
+                    # Encolar línea
+                    try: jobs[job_id]['log'].put_nowait(line.rstrip())
+                    except queue.Full: pass
+                    # Extraer tiempo
+                    m = time_re.search(line)
+                    if m and duration > 0:
+                        hh, mm, ss = int(m.group(1)), int(m.group(2)), float(m.group(3))
+                        cur = hh*3600 + mm*60 + ss
+                        pct = max(0.0, min(100.0, (cur/duration)*100.0))
+                        jobs[job_id]['progress'] = pct
+                
+                ret = proc.wait()
+                if ret == 0:
+                    jobs[job_id]['progress'] = 100.0
+                else:
+                    jobs[job_id]['status'] = 'error'
+                    jobs[job_id]['error'] = f"ffmpeg salió con código {ret}"
+                    return
+            
+            # Limpieza del archivo subido
             try: os.remove(input_path)
             except Exception: pass
-            if ret == 0:
-                jobs[job_id]['progress'] = 100.0
-                jobs[job_id]['status'] = 'done'
-            else:
-                jobs[job_id]['status'] = 'error'
-                jobs[job_id]['error'] = f"ffmpeg salió con código {ret}"
+            
+            jobs[job_id]['status'] = 'done'
+            
         except Exception as e:
             jobs[job_id]['status'] = 'error'
             jobs[job_id]['error'] = str(e)
+            try: jobs[job_id]['log'].put_nowait(f"❌ Error: {str(e)}")
+            except: pass
 
-    threading.Thread(target=run_ffmpeg, daemon=True).start()
+    threading.Thread(target=run_conversion, daemon=True).start()
 
     return jsonify({'job_id': job_id, 'download_url': url_for('download', job_id=job_id, _external=False)})
 
@@ -633,8 +910,11 @@ def main():
     
     # Modo web (por defecto)
     else:
-        print("Iniciando servidor web en http://localhost:5000")
-        print("Usa --help para ver opciones de línea de comandos")
+        print("🌐 Iniciando servidor web en http://localhost:5000")
+        print("📚 Usa --help para ver opciones de línea de comandos")
+        print("")
+        print_whisper_info()
+        print("")
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         os.makedirs(app.config['CONVERTED_FOLDER'], exist_ok=True)
         app.run(host="0.0.0.0", port=5000, debug=True)

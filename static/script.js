@@ -13,15 +13,33 @@ const barPct = document.getElementById('bar-pct');
 const logsEl = document.getElementById('logs');
 const downloadLink = document.getElementById('download-link');
 
-// Manejar cambio de formato para deshabilitar GPU en MP3
+// Manejar cambio de formato para deshabilitar GPU en MP3 y mostrar opciones SRT
 formatSelect.addEventListener('change', () => {
-  if (formatSelect.value === 'mp3') {
+  const isAudioOnly = formatSelect.value === 'mp3';
+  const isSrt = formatSelect.value === 'srt';
+  const srtOptions = document.getElementById('srt-options');
+
+  if (isAudioOnly) {
     gpuCheckbox.checked = false;
     gpuCheckbox.disabled = true;
     gpuCheckbox.parentElement.style.opacity = '0.5';
   } else {
     gpuCheckbox.disabled = false;
     gpuCheckbox.parentElement.style.opacity = '1';
+  }
+
+  // Mostrar/ocultar opciones SRT
+  if (isSrt) {
+    srtOptions.classList.remove('hidden');
+    gpuCheckbox.checked = false;
+    gpuCheckbox.disabled = true;
+    gpuCheckbox.parentElement.style.opacity = '0.5';
+  } else {
+    srtOptions.classList.add('hidden');
+    if (!isAudioOnly) {
+      gpuCheckbox.disabled = false;
+      gpuCheckbox.parentElement.style.opacity = '1';
+    }
   }
 });
 
