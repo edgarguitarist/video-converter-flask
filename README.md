@@ -10,14 +10,16 @@ Aplicación web y herramienta de línea de comandos para convertir videos usando
 - 📊 **Progreso en Tiempo Real**: Barras de progreso y logs detallados
 - ⏱️ **Medición de Tiempo**: Duración de conversión en CLI y PowerShell
 - 🔄 **Múltiples Formatos**: MP4, WebM, AVI, MKV
-- � **Extracción de Audio**: MP3 para transcripción con IA
-- �🎯 **Integración PowerShell**: Funciones globales para tu perfil
+- 🎵 **Extracción de Audio**: MP3 para transcripción con IA
+- 🤖 **Transcripción con IA**: Generación automática de subtítulos SRT
+- **Integración PowerShell**: Funciones globales para tu perfil
 
 ## 🔧 Requisitos
 
 - **Python 3.12+**
 - **ffmpeg** instalado y en el PATH del sistema
 - **GPU NVIDIA** (opcional, para aceleración)
+- **OpenAI Whisper** (opcional, para transcripción con IA)
 
 ### Instalar ffmpeg
 
@@ -91,10 +93,16 @@ python app.py --mp4 "video.mov"           # → video.mp4 (misma carpeta)
 python app.py --webm "video.mp4" --gpu    # → video.webm (misma carpeta)
 python app.py --mkv "C:\Videos\video.avi" # → C:\Videos\video.mkv
 python app.py --mp3 "video.mp4"           # → video.mp3 (extrae audio)
+python app.py --srt "video.mp4"           # → video.srt (subtítulos con IA)
+
+# Con modelo específico para transcripción
+python app.py --srt "conferencia.mov" --model medium
+python app.py --srt "video.mkv" "subtitulos.srt" --model large
 
 # Con ruta de salida específica
 python app.py --mkv "video.avi" "C:\Output\converted.mkv"
 python app.py --mp3 "conferencia.mp4" "C:\Audio\conferencia.mp3"
+python app.py --srt "video.mp4" "C:\Subtitulos\video.srt" --model base
 python app.py --help
 ```
 
@@ -115,6 +123,8 @@ Convert-Video -MP4 "video.mov"
 Convert-Video -WebM "video.mp4" -GPU
 Convert-Video -MKV "video.avi" "C:\salida\video.mkv"
 Convert-Video -MP3 "video.mp4"       # Extraer audio
+Convert-Video -SRT "video.mp4"       # Generar subtítulos con IA
+Convert-Video -SRT "video.mov" -Model medium  # Con modelo específico
 Convert-Video -Web                    # Inicia servidor web
 Convert-Video -Help                   # Ayuda completa
 
@@ -124,6 +134,8 @@ cvt-webm "video.mp4" -GPU
 cvt-avi "video.mkv"
 cvt-mkv "video.mp4" "salida.mkv"
 cvt-mp3 "video.mp4"                   # Extraer audio
+cvt-srt "video.mp4"                   # Generar subtítulos (modelo base)
+cvt-srt "video.mp4" -Model large      # Con modelo de alta calidad
 cvt-web                               # Servidor web
 cvt-help                              # Ayuda rápida
 ```
@@ -138,13 +150,14 @@ cvt-help                              # Ayuda rápida
 
 ### Salida
 
-| Formato  | Descripción                      | GPU Support    |
-| -------- | -------------------------------- | -------------- |
-| **MP4**  | H.264/AAC, máxima compatibilidad | ✅ H.264 NVENC |
-| **WebM** | VP9/Opus para web                | ✅ AV1 NVENC\* |
-| **AVI**  | MPEG-4/MP3, legacy               | ❌ CPU only    |
-| **MKV**  | H.264/HEVC/AAC, alta calidad     | ✅ HEVC NVENC  |
-| **MP3**  | Audio únicamente (transcripción) | ❌ CPU only    |
+| Formato  | Descripción                        | GPU Support    |
+| -------- | ---------------------------------- | -------------- |
+| **MP4**  | H.264/AAC, máxima compatibilidad   | ✅ H.264 NVENC |
+| **WebM** | VP9/Opus para web                  | ✅ AV1 NVENC\* |
+| **AVI**  | MPEG-4/MP3, legacy                 | ❌ CPU only    |
+| **MKV**  | H.264/HEVC/AAC, alta calidad       | ✅ HEVC NVENC  |
+| **MP3**  | Audio únicamente (transcripción)   | ❌ CPU only    |
+| **SRT**  | Subtítulos con IA (OpenAI Whisper) | ❌ CPU only    |
 
 _\*AV1 NVENC requiere GPUs Ada Lovelace o newer_
 
@@ -207,7 +220,9 @@ video-converter-flask/
 - **[USAGE.md](./USAGE.md)** - Guía detallada de uso
 - **[PROFILE-INTEGRATION.md](./PROFILE-INTEGRATION.md)** - Integración con PowerShell
 - **[AUDIO-EXTRACTION.md](./AUDIO-EXTRACTION.md)** - Extracción de audio MP3 para IA
+- **[TRANSCRIPTION-AI.md](./TRANSCRIPTION-AI.md)** - Transcripción con IA y subtítulos SRT
 - **[TIMING-FEATURE.md](./TIMING-FEATURE.md)** - Medición de tiempo de conversión
+- **[MP3-EXAMPLES.md](./MP3-EXAMPLES.md)** - Ejemplos prácticos de extracción de audio
 - **[SYNTAX-EXAMPLES.ps1](./SYNTAX-EXAMPLES.ps1)** - Ejemplos de sintaxis
 
 ## 🛠️ Desarrollo

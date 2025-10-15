@@ -1,9 +1,17 @@
 
 import os, re, json, uuid, subprocess, threading, queue, time, argparse, sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from flask import Flask, render_template, request, send_file, abort, Response, jsonify, url_for
 from werkzeug.utils import secure_filename
+
+# Importación condicional de Whisper
+try:
+    import whisper
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
+    whisper = None
 
 ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.mkv', '.avi', '.wmv', '.flv', '.webm', '.m4v'}
 MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # 2GB
@@ -27,6 +35,61 @@ def list_ffmpeg_encoders() -> str:
 def has_encoder(name: str) -> bool:
     encs = list_ffmpeg_encoders()
     return (name in encs) if encs else False
+
+def seconds_to_srt_time(seconds: float) -> str:
+    """
+    Convierte segundos a formato de tiempo SRT (HH:MM:SS,mmm)
+    """
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    millisecs = int((seconds % 1) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millisecs:03d}"
+
+def transcribe_audio_to_srt(audio_path: str, output_srt_path: str, model_size: str = "base") -> bool:
+    """
+    Transcribe audio usando Whisper y genera archivo SRT con timestamps
+    """
+    if not WHISPER_AVAILABLE:
+        print("❌ ERROR: Whisper no está instalado. Instala con: pip install openai-whisper")
+        return False
+    
+    if not os.path.exists(audio_path):
+        print(f"❌ ERROR: Archivo de audio no encontrado: {audio_path}")
+        return False
+    
+    try:
+        print(f"🤖 Cargando modelo Whisper ({model_size})...")
+        model = whisper.load_model(model_size)
+        
+        print(f"🎵 Transcribiendo audio: {audio_path}")
+        result = model.transcribe(audio_path, word_timestamps=True)
+        
+        print(f"📄 Generando archivo SRT: {output_srt_path}")
+        
+        # Crear directorio de salida si no existe
+        os.makedirs(os.path.dirname(output_srt_path), exist_ok=True)
+        
+        with open(output_srt_path, 'w', encoding='utf-8') as f:
+            subtitle_index = 1
+            
+            for segment in result['segments']:
+                start_time = seconds_to_srt_time(segment['start'])
+                end_time = seconds_to_srt_time(segment['end'])
+                text = segment['text'].strip()
+                
+                f.write(f"{subtitle_index}\n")
+                f.write(f"{start_time} --> {end_time}\n")
+                f.write(f"{text}\n\n")
+                
+                subtitle_index += 1
+        
+        print(f"✅ Subtítulos generados exitosamente: {output_srt_path}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ ERROR durante la transcripción: {e}")
+        return False
 
 def get_codec_args(target_format: str, use_gpu: bool = False) -> tuple:
     """
@@ -309,8 +372,11 @@ def main():
     parser.add_argument('--avi', metavar='INPUT', help='Convertir a AVI. Especifica la ruta del video de entrada.')
     parser.add_argument('--mkv', metavar='INPUT', help='Convertir a MKV. Especifica la ruta del video de entrada.')
     parser.add_argument('--mp3', metavar='INPUT', help='Extraer audio a MP3. Especifica la ruta del video de entrada.')
+    parser.add_argument('--srt', metavar='INPUT', help='Extraer audio a MP3 y generar subtítulos SRT con IA. Especifica la ruta del video de entrada.')
     parser.add_argument('output', nargs='?', help='Ruta de salida (opcional, usa la misma carpeta del video de entrada por defecto)')
-    parser.add_argument('--gpu', action='store_true', help='Usar aceleración GPU (NVENC) - no aplica para MP3')
+    parser.add_argument('--gpu', action='store_true', help='Usar aceleración GPU (NVENC) - no aplica para MP3/SRT')
+    parser.add_argument('--model', default='base', choices=['tiny', 'base', 'small', 'medium', 'large'], 
+                        help='Modelo Whisper para transcripción (tiny/base/small/medium/large). Default: base')
     parser.add_argument('--web', action='store_true', help='Iniciar servidor web (modo por defecto)')
     
     args = parser.parse_args()
@@ -334,6 +400,9 @@ def main():
     elif args.mp3:
         input_file = args.mp3
         target_format = 'mp3'
+    elif args.srt:
+        input_file = args.srt
+        target_format = 'srt'
     
     # Modo CLI
     if input_file and target_format:
@@ -343,15 +412,68 @@ def main():
         else:
             # Usar la misma carpeta del archivo de entrada
             input_path_obj = Path(input_file)
-            output_filename = f"{input_path_obj.stem}.{target_format}"
+            if target_format == 'srt':
+                output_filename = f"{input_path_obj.stem}.srt"
+            else:
+                output_filename = f"{input_path_obj.stem}.{target_format}"
             output_path = input_path_obj.parent / output_filename
             output_path = str(output_path)  # Convertir a string para compatibilidad
         
-        # Realizar conversión
-        # Para MP3, desactivar GPU ya que es solo audio
-        use_gpu = args.gpu and target_format != 'mp3'
-        success = convert_video_cli(input_file, output_path, target_format, use_gpu)
-        sys.exit(0 if success else 1)
+        # Modo especial para SRT (extrae MP3 primero y luego transcribe)
+        if target_format == 'srt':
+            # Generar ruta temporal para MP3
+            input_path_obj = Path(input_file)
+            temp_mp3_path = input_path_obj.parent / f"{input_path_obj.stem}_temp.mp3"
+            temp_mp3_path = str(temp_mp3_path)
+            
+            print(f"🎬 Procesando video para subtítulos: {input_file}")
+            print(f"📄 Archivo SRT de salida: {output_path}")
+            print(f"🤖 Modelo Whisper: {args.model}")
+            print("-" * 60)
+            
+            # Paso 1: Extraer audio a MP3
+            print("📤 Paso 1/2: Extrayendo audio...")
+            use_gpu = args.gpu and False  # GPU no aplica para audio
+            success = convert_video_cli(input_file, temp_mp3_path, 'mp3', use_gpu)
+            
+            if not success:
+                print("❌ Error extrayendo audio")
+                sys.exit(1)
+            
+            # Paso 2: Transcribir con Whisper
+            print("\n🤖 Paso 2/2: Transcribiendo con IA...")
+            start_time = time.time()
+            success = transcribe_audio_to_srt(temp_mp3_path, output_path, args.model)
+            end_time = time.time()
+            
+            # Limpiar archivo temporal MP3
+            try:
+                os.remove(temp_mp3_path)
+                print(f"🗑️  Archivo temporal MP3 eliminado")
+            except Exception:
+                pass
+            
+            # Mostrar tiempo total
+            elapsed_time = end_time - start_time
+            minutes = int(elapsed_time // 60)
+            seconds = elapsed_time % 60
+            time_str = f"{minutes:02d}:{seconds:05.2f}" if minutes > 0 else f"{seconds:.2f}s"
+            
+            if success:
+                print(f"✅ Subtítulos completados: {output_path}")
+                print(f"⏱️  Tiempo de transcripción: {time_str}")
+            else:
+                print(f"❌ Error en la transcripción")
+                print(f"⏱️  Tiempo transcurrido: {time_str}")
+            
+            sys.exit(0 if success else 1)
+        
+        # Realizar conversión normal (no SRT)
+        else:
+            # Para MP3, desactivar GPU ya que es solo audio
+            use_gpu = args.gpu and target_format != 'mp3'
+            success = convert_video_cli(input_file, output_path, target_format, use_gpu)
+            sys.exit(0 if success else 1)
     
     # Modo web (por defecto)
     else:

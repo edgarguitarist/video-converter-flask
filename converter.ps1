@@ -28,9 +28,13 @@ function Convert-Video {
         [switch]$AVI,
         [switch]$MKV,
         [switch]$MP3,
+        [switch]$SRT,
         [switch]$GPU,
         [switch]$Web,
-        [switch]$Help
+        [switch]$Help,
+        
+        [ValidateSet('tiny', 'base', 'small', 'medium', 'large')]
+        [string]$Model = 'base'
     )
     
     # Configuración de rutas del proyecto
@@ -66,6 +70,7 @@ function Convert-Video {
     if ($AVI) { $Format = "avi"; $FormatCount++ }
     if ($MKV) { $Format = "mkv"; $FormatCount++ }
     if ($MP3) { $Format = "mp3"; $FormatCount++ }
+    if ($SRT) { $Format = "srt"; $FormatCount++ }
     
     # Validar que solo se especificó un formato
     if ($FormatCount -gt 1) {
@@ -121,9 +126,10 @@ function Convert-Video {
         else {
             # Modo conversión CLI
             if (-not $Format) {
-                Write-Host "❌ ERROR: Debe especificar un formato (-MP4, -WebM, -AVI, -MKV, -MP3)" -ForegroundColor Red
+                Write-Host "❌ ERROR: Debe especificar un formato (-MP4, -WebM, -AVI, -MKV, -MP3, -SRT)" -ForegroundColor Red
                 Write-Host "💡 Ejemplo: Convert-Video -MP4 'video.mov'" -ForegroundColor Yellow
                 Write-Host "💡 Ejemplo: Convert-Video -MP3 'video.mp4' # Extraer audio" -ForegroundColor Yellow
+                Write-Host "💡 Ejemplo: Convert-Video -SRT 'video.mp4' # Generar subtítulos" -ForegroundColor Yellow
                 return
             }
             
@@ -144,9 +150,18 @@ function Convert-Video {
                 $PythonArgs += "--gpu"
             }
             
+            # Añadir modelo para SRT
+            if ($Format -eq "srt") {
+                $PythonArgs += "--model"
+                $PythonArgs += $Model
+            }
+            
             Write-Host "🔄 Convirtiendo a $($Format.ToUpper())..." -ForegroundColor Blue
             if ($Format -eq "mp3") {
                 Write-Host "🎵 Extrayendo audio..." -ForegroundColor Magenta
+            }
+            elseif ($Format -eq "srt") {
+                Write-Host "🤖 Generando subtítulos con IA (modelo: $Model)..." -ForegroundColor Magenta
             }
             elseif ($GPU) {
                 Write-Host "⚡ Usando aceleración GPU" -ForegroundColor Cyan
@@ -232,6 +247,18 @@ function cvt-mp3 {
     Convert-Video -MP3 -InputPath $InputPath -OutputPath $OutputPath
 }
 
+function cvt-srt {
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$InputPath,
+        [Parameter(Position = 1)]
+        [string]$OutputPath,
+        [ValidateSet('tiny', 'base', 'small', 'medium', 'large')]
+        [string]$Model = 'base'
+    )
+    Convert-Video -SRT -InputPath $InputPath -OutputPath $OutputPath -Model $Model
+}
+
 function cvt-web {
     Convert-Video -Web
 }
@@ -246,6 +273,7 @@ function cvt-help {
     Write-Host "  Convert-Video -AVI 'archivo.mkv'           - Convertir a AVI" -ForegroundColor White
     Write-Host "  Convert-Video -MKV 'archivo.mp4' -GPU      - Convertir a MKV con GPU" -ForegroundColor White
     Write-Host "  Convert-Video -MP3 'archivo.mp4'           - Extraer audio a MP3" -ForegroundColor White
+    Write-Host "  Convert-Video -SRT 'archivo.mp4'           - Generar subtítulos con IA" -ForegroundColor White
     Write-Host "  Convert-Video -Web                         - Iniciar servidor web" -ForegroundColor White
     Write-Host "  Convert-Video -Help                        - Mostrar ayuda completa" -ForegroundColor White
     Write-Host ""
@@ -255,21 +283,32 @@ function cvt-help {
     Write-Host "  cvt-avi 'video.mkv'                        - Convertir a AVI" -ForegroundColor White
     Write-Host "  cvt-mkv 'video.avi' 'salida.mkv'           - Convertir a MKV" -ForegroundColor White
     Write-Host "  cvt-mp3 'video.mp4'                        - Extraer audio a MP3" -ForegroundColor White
+    Write-Host "  cvt-srt 'video.mp4'                        - Generar subtítulos SRT" -ForegroundColor White
     Write-Host "  cvt-web                                     - Iniciar servidor web" -ForegroundColor White
     Write-Host "  cvt-help                                    - Mostrar esta ayuda" -ForegroundColor White
     Write-Host ""
     Write-Host "💡 Ejemplos de uso:" -ForegroundColor Yellow
     Write-Host "  cvt-mp4 'video.mov'" -ForegroundColor Gray
     Write-Host "  cvt-mp3 'conferencia.mp4'" -ForegroundColor Gray
+    Write-Host "  cvt-srt 'conferencia.mp4'" -ForegroundColor Gray
+    Write-Host "  cvt-srt 'video.mkv' -Model medium" -ForegroundColor Gray
     Write-Host "  Convert-Video -WebM 'video.mp4' -GPU" -ForegroundColor Gray
-    Write-Host "  Convert-Video -MP3 'video.avi' 'C:\audio\audio.mp3'" -ForegroundColor Gray
+    Write-Host "  Convert-Video -SRT 'video.avi' 'C:\subtitulos\video.srt' -Model large" -ForegroundColor Gray
     Write-Host "  Convert-Video -Help" -ForegroundColor Gray
     Write-Host "  cvt-web" -ForegroundColor Gray
     Write-Host ""
     Write-Host "⚡ Switches disponibles:" -ForegroundColor Yellow
-    Write-Host "  -GPU     : Usar aceleración GPU (NVENC) - no aplica para MP3" -ForegroundColor White
+    Write-Host "  -GPU     : Usar aceleración GPU (NVENC) - no aplica para MP3/SRT" -ForegroundColor White
+    Write-Host "  -Model   : Modelo Whisper (tiny/base/small/medium/large) - solo para SRT" -ForegroundColor White
     Write-Host "  -Web     : Iniciar servidor web" -ForegroundColor White
     Write-Host "  -Help    : Mostrar ayuda del script Python" -ForegroundColor White
+    Write-Host ""
+    Write-Host "🤖 Modelos Whisper disponibles:" -ForegroundColor Yellow
+    Write-Host "  tiny     : Más rápido, menos preciso (~39 MB)" -ForegroundColor White
+    Write-Host "  base     : Equilibrado, recomendado (~74 MB)" -ForegroundColor White
+    Write-Host "  small    : Mejor calidad (~244 MB)" -ForegroundColor White
+    Write-Host "  medium   : Alta calidad (~769 MB)" -ForegroundColor White
+    Write-Host "  large    : Máxima calidad (~1550 MB)" -ForegroundColor White
     Write-Host ""
     Write-Host "🎵 Extracción de audio:" -ForegroundColor Yellow
     Write-Host "  La extracción a MP3 es ideal para transcripción con IA" -ForegroundColor White
