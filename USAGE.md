@@ -37,11 +37,11 @@ python app.py --<formato> "archivo_entrada" ["archivo_salida"] [--gpu]
 #### Ejemplos:
 
 ```powershell
-# Conversión básica (salida en ./converted/)
-python app.py --mp4 "video.mov"
-python app.py --webm "video.mp4"
-python app.py --avi "video.mkv"
-python app.py --mkv "video.avi"
+# Conversión básica (salida en la misma carpeta del archivo de entrada)
+python app.py --mp4 "video.mov"           # → video.mp4 (misma carpeta)
+python app.py --webm "video.mp4"          # → video.webm (misma carpeta)
+python app.py --avi "video.mkv"           # → video.avi (misma carpeta)
+python app.py --mkv "video.avi"           # → video.mkv (misma carpeta)
 
 # Con aceleración GPU
 python app.py --mp4 "video.mov" --gpu
@@ -151,9 +151,9 @@ cvt-webm "video.mp4" -GPU
 #### Automática (por defecto):
 
 ```powershell
-# Se guarda en ./converted/
+# Automática: misma carpeta del archivo de entrada
 cvt-mp4 "video.mov"
-# Resultado: ./converted/video.mp4
+# Resultado: video.mp4 (en la misma carpeta que video.mov)
 ```
 
 #### Personalizada:

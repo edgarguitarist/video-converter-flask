@@ -81,9 +81,10 @@ _\*AV1 NVENC requiere RTX 40 series+_
 
 #### **Gestión de Rutas:**
 
+- ✅ **CLI**: Salida en la misma carpeta del archivo de entrada
+- ✅ **Web**: Salida en directorio `./converted/` dedicado
 - ✅ Rutas relativas resueltas correctamente
 - ✅ Rutas absolutas soportadas
-- ✅ Directorio `./converted/` por defecto
 - ✅ Funciona desde cualquier ubicación
 
 #### **Validaciones:**
@@ -105,10 +106,10 @@ _\*AV1 NVENC requiere RTX 40 series+_
 #### **Para Uso Regular:**
 
 ```powershell
-# Uso diario después de configuración
-cvt-mp4 "video.mov"          # Conversión rápida
-cvt-webm "video.mp4" -GPU     # Con aceleración
-cvt-web                       # Interfaz web si necesitas
+# Uso diario después de configuración - archivos se crean en la misma carpeta
+cvt-mp4 "video.mov"          # → video.mp4 (misma carpeta)
+cvt-webm "video.mp4" -GPU     # → video.webm (misma carpeta)
+cvt-web                       # → Interfaz web (./converted/)
 ```
 
 ### 🔄 **Migración de Sintaxis Anterior**

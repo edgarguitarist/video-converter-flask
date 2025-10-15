@@ -290,7 +290,7 @@ def main():
     parser.add_argument('--webm', metavar='INPUT', help='Convertir a WebM. Especifica la ruta del video de entrada.')
     parser.add_argument('--avi', metavar='INPUT', help='Convertir a AVI. Especifica la ruta del video de entrada.')
     parser.add_argument('--mkv', metavar='INPUT', help='Convertir a MKV. Especifica la ruta del video de entrada.')
-    parser.add_argument('output', nargs='?', help='Ruta de salida (opcional, usa ./converted/ por defecto)')
+    parser.add_argument('output', nargs='?', help='Ruta de salida (opcional, usa la misma carpeta del video de entrada por defecto)')
     parser.add_argument('--gpu', action='store_true', help='Usar aceleración GPU (NVENC)')
     parser.add_argument('--web', action='store_true', help='Iniciar servidor web (modo por defecto)')
     
@@ -319,11 +319,11 @@ def main():
         if args.output:
             output_path = args.output
         else:
-            # Usar directorio converted por defecto
+            # Usar la misma carpeta del archivo de entrada
             input_path_obj = Path(input_file)
-            converted_dir = os.path.join(os.getcwd(), 'converted')
             output_filename = f"{input_path_obj.stem}.{target_format}"
-            output_path = os.path.join(converted_dir, output_filename)
+            output_path = input_path_obj.parent / output_filename
+            output_path = str(output_path)  # Convertir a string para compatibilidad
         
         # Realizar conversión
         success = convert_video_cli(input_file, output_path, target_format, args.gpu)

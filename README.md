@@ -84,10 +84,13 @@ python app.py
 # Sintaxis básica
 python app.py --<formato> "archivo_entrada" ["archivo_salida"] [--gpu]
 
-# Ejemplos
-python app.py --mp4 "video.mov"
-python app.py --webm "video.mp4" --gpu
-python app.py --mkv "video.avi" "C:\salida\video.mkv"
+# Ejemplos - salida en la misma carpeta del archivo de entrada
+python app.py --mp4 "video.mov"           # → video.mp4 (misma carpeta)
+python app.py --webm "video.mp4" --gpu    # → video.webm (misma carpeta)
+python app.py --mkv "C:\Videos\video.avi" # → C:\Videos\video.mkv
+
+# Con ruta de salida específica
+python app.py --mkv "video.avi" "C:\Output\converted.mkv"
 python app.py --help
 ```
 
@@ -146,7 +149,7 @@ _\*AV1 NVENC requiere GPUs Ada Lovelace o newer_
 - **HEVC NVENC**: MKV (GTX 10 series+)
 - **AV1 NVENC**: WebM (RTX 40 series+)
 
-### Fallback Automático:
+### Fallback Automático
 
 Si el encoder GPU no está disponible, automáticamente usa CPU.
 
@@ -164,8 +167,33 @@ video-converter-flask/
 │   ├── styles.css        # Estilos
 │   └── script.js         # JavaScript frontend
 ├── uploads/              # Archivos temporales
-└── converted/            # Archivos de salida
+└── converted/            # Archivos de salida (solo web)
 ```
+
+### Comportamiento de Rutas de Salida
+
+**🌐 Interfaz Web:**
+
+- Archivos temporales en `uploads/`
+- Archivos convertidos en `converted/`
+- Nombres con timestamp para evitar conflictos
+
+**💻 Línea de Comandos:**
+
+- **Por defecto:** Misma carpeta del archivo de entrada
+- **Personalizado:** Ruta especificada por el usuario
+- **Ejemplo:** `video.mov` → `video.mp4` (misma carpeta)
+  ├── converter.ps1 # Funciones PowerShell
+  ├── convert-simple.ps1 # Script simple standalone
+  ├── templates/
+  │ └── index.html # Interfaz web
+  ├── static/
+  │ ├── styles.css # Estilos
+  │ └── script.js # JavaScript frontend
+  ├── uploads/ # Archivos temporales
+  └── converted/ # Archivos de salida
+
+````
 
 ## 📚 Documentación Adicional
 
@@ -179,7 +207,7 @@ video-converter-flask/
 
 ```powershell
 python app.py  # Debug mode habilitado por defecto
-```
+````
 
 ### Estructura de funciones principales:
 
