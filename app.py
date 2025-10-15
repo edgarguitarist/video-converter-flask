@@ -57,6 +57,10 @@ def get_codec_args(target_format: str, use_gpu: bool = False) -> tuple:
     elif target_format == 'avi':
         # AVI no suele beneficiarse del pipeline NVENC moderno; mantenemos SW
         codec_args = ['-c:v','mpeg4','-qscale:v','5','-c:a','libmp3lame','-q:a','4']
+    elif target_format == 'mp3':
+        # Extracción de audio en MP3 - sin video
+        codec_args = ['-vn', '-c:a', 'libmp3lame', '-b:a', '192k', '-ar', '44100']
+        chosen_encoder = 'Audio only'
     else:  # mkv
         if use_gpu:
             chosen_encoder = 'hevc_nvenc'
@@ -68,7 +72,7 @@ def get_codec_args(target_format: str, use_gpu: bool = False) -> tuple:
         else:
             codec_args = ['-c:v','libx264','-preset','veryfast','-crf','23','-c:a','aac','-b:a','128k']
     
-    return codec_args, chosen_encoder if use_gpu else None
+    return codec_args, chosen_encoder if use_gpu or target_format == 'mp3' else None
 
 def convert_video_cli(input_path: str, output_path: str, target_format: str, use_gpu: bool = False) -> bool:
     """
@@ -180,7 +184,7 @@ def convert():
     target_format = request.form.get('format', '').lower().strip()
     use_gpu = request.form.get('gpu', 'off') == 'on'
 
-    if target_format not in {'mp4','webm','avi','mkv'}:
+    if target_format not in {'mp4','webm','avi','mkv','mp3'}:
         abort(400, "Formato objetivo inválido.")
     if f.filename == '':
         abort(400, "Nombre de archivo vacío.")
@@ -304,8 +308,9 @@ def main():
     parser.add_argument('--webm', metavar='INPUT', help='Convertir a WebM. Especifica la ruta del video de entrada.')
     parser.add_argument('--avi', metavar='INPUT', help='Convertir a AVI. Especifica la ruta del video de entrada.')
     parser.add_argument('--mkv', metavar='INPUT', help='Convertir a MKV. Especifica la ruta del video de entrada.')
+    parser.add_argument('--mp3', metavar='INPUT', help='Extraer audio a MP3. Especifica la ruta del video de entrada.')
     parser.add_argument('output', nargs='?', help='Ruta de salida (opcional, usa la misma carpeta del video de entrada por defecto)')
-    parser.add_argument('--gpu', action='store_true', help='Usar aceleración GPU (NVENC)')
+    parser.add_argument('--gpu', action='store_true', help='Usar aceleración GPU (NVENC) - no aplica para MP3')
     parser.add_argument('--web', action='store_true', help='Iniciar servidor web (modo por defecto)')
     
     args = parser.parse_args()
@@ -326,6 +331,9 @@ def main():
     elif args.mkv:
         input_file = args.mkv
         target_format = 'mkv'
+    elif args.mp3:
+        input_file = args.mp3
+        target_format = 'mp3'
     
     # Modo CLI
     if input_file and target_format:
@@ -340,7 +348,9 @@ def main():
             output_path = str(output_path)  # Convertir a string para compatibilidad
         
         # Realizar conversión
-        success = convert_video_cli(input_file, output_path, target_format, args.gpu)
+        # Para MP3, desactivar GPU ya que es solo audio
+        use_gpu = args.gpu and target_format != 'mp3'
+        success = convert_video_cli(input_file, output_path, target_format, use_gpu)
         sys.exit(0 if success else 1)
     
     # Modo web (por defecto)

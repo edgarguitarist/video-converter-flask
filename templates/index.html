@@ -1,59 +1,83 @@
-
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Conversor de Video</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-  <main class="container">
-    <h1>Conversor de Video</h1>
-    <p>Arrastra y suelta un video o haz clic para seleccionarlo. Luego elige el formato de salida.</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Conversor de Video</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Conversor de Video</h1>
+      <p>
+        Arrastra y suelta un video o haz clic para seleccionarlo. Luego elige el
+        formato de salida.
+      </p>
 
-    <form id="convert-form" action="/convert" method="POST" enctype="multipart/form-data">
-      <div id="dropzone" class="dropzone">
-        <input id="file-input" type="file" name="file" accept="video/*" required hidden>
-        <div id="dz-instructions">
-          <strong>Arrastra tu video aquí</strong> o <button type="button" id="browse-btn">Examinar</button>
-          <div id="filename" class="filename"></div>
+      <form
+        id="convert-form"
+        action="/convert"
+        method="POST"
+        enctype="multipart/form-data"
+      >
+        <div id="dropzone" class="dropzone">
+          <input
+            id="file-input"
+            type="file"
+            name="file"
+            accept="video/*"
+            required
+            hidden
+          />
+          <div id="dz-instructions">
+            <strong>Arrastra tu video aquí</strong> o
+            <button type="button" id="browse-btn">Examinar</button>
+            <div id="filename" class="filename"></div>
+          </div>
         </div>
-      </div>
 
-      <label for="format">Formato de salida</label>
-      <select id="format" name="format" required>
-        <option value="mp4">MP4 (H.264)</option>
-        <option value="webm">WEBM (VP9/AV1)</option>
-        <option value="avi">AVI (MPEG-4)</option>
-        <option value="mkv">MKV (H.264/HEVC)</option>
-      </select>
+        <label for="format">Formato de salida</label>
+        <select id="format" name="format" required>
+          <option value="mp4">MP4 (H.264)</option>
+          <option value="webm">WEBM (VP9/AV1)</option>
+          <option value="avi">AVI (MPEG-4)</option>
+          <option value="mkv">MKV (H.264/HEVC)</option>
+          <option value="mp3">MP3 (Audio solamente)</option>
+        </select>
 
-      <label class="gpu-row">
-        <input type="checkbox" id="gpu" name="gpu" checked>
-        <span>Usar GPU (NVENC/AV1) — recomendado con RTX 40xx</span>
-      </label>
+        <label class="gpu-row">
+          <input type="checkbox" id="gpu" name="gpu" checked />
+          <span>Usar GPU (NVENC/AV1) — recomendado con RTX 40xx</span>
+        </label>
 
-      <button class="btn" type="submit">Convertir</button>
-    </form>
+        <button class="btn" type="submit">Convertir</button>
+      </form>
 
-    <section id="progress-area" class="hidden">
-      <div class="bar-wrap">
-        <div id="bar" class="bar" style="width:0%"></div>
-      </div>
-      <div class="bar-text"><span id="bar-pct">0%</span></div>
-      <details open class="logs">
-        <summary>Logs</summary>
-        <pre id="logs"></pre>
-      </details>
-      <a id="download-link" class="hidden btn" href="#">Descargar convertido</a>
-    </section>
+      <section id="progress-area" class="hidden">
+        <div class="bar-wrap">
+          <div id="bar" class="bar" style="width: 0%"></div>
+        </div>
+        <div class="bar-text"><span id="bar-pct">0%</span></div>
+        <details open class="logs">
+          <summary>Logs</summary>
+          <pre id="logs"></pre>
+        </details>
+        <a id="download-link" class="hidden btn" href="#"
+          >Descargar convertido</a
+        >
+      </section>
 
-    <footer>
-      <small>Necesitas tener <code>ffmpeg</code> instalado y disponible en el PATH del sistema.</small>
-    </footer>
-  </main>
+      <footer>
+        <small
+          >Necesitas tener <code>ffmpeg</code> instalado y disponible en el PATH
+          del sistema.</small
+        >
+      </footer>
+    </main>
 
-  <script src="{{ url_for('static', filename='script.js') }}"></script>
-</body>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+  </body>
 </html>

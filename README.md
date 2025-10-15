@@ -10,7 +10,8 @@ Aplicación web y herramienta de línea de comandos para convertir videos usando
 - 📊 **Progreso en Tiempo Real**: Barras de progreso y logs detallados
 - ⏱️ **Medición de Tiempo**: Duración de conversión en CLI y PowerShell
 - 🔄 **Múltiples Formatos**: MP4, WebM, AVI, MKV
-- 🎯 **Integración PowerShell**: Funciones globales para tu perfil
+- � **Extracción de Audio**: MP3 para transcripción con IA
+- �🎯 **Integración PowerShell**: Funciones globales para tu perfil
 
 ## 🔧 Requisitos
 
@@ -89,9 +90,11 @@ python app.py --<formato> "archivo_entrada" ["archivo_salida"] [--gpu]
 python app.py --mp4 "video.mov"           # → video.mp4 (misma carpeta)
 python app.py --webm "video.mp4" --gpu    # → video.webm (misma carpeta)
 python app.py --mkv "C:\Videos\video.avi" # → C:\Videos\video.mkv
+python app.py --mp3 "video.mp4"           # → video.mp3 (extrae audio)
 
 # Con ruta de salida específica
 python app.py --mkv "video.avi" "C:\Output\converted.mkv"
+python app.py --mp3 "conferencia.mp4" "C:\Audio\conferencia.mp3"
 python app.py --help
 ```
 
@@ -111,6 +114,7 @@ python app.py --help
 Convert-Video -MP4 "video.mov"
 Convert-Video -WebM "video.mp4" -GPU
 Convert-Video -MKV "video.avi" "C:\salida\video.mkv"
+Convert-Video -MP3 "video.mp4"       # Extraer audio
 Convert-Video -Web                    # Inicia servidor web
 Convert-Video -Help                   # Ayuda completa
 
@@ -119,6 +123,7 @@ cvt-mp4 "video.mov"
 cvt-webm "video.mp4" -GPU
 cvt-avi "video.mkv"
 cvt-mkv "video.mp4" "salida.mkv"
+cvt-mp3 "video.mp4"                   # Extraer audio
 cvt-web                               # Servidor web
 cvt-help                              # Ayuda rápida
 ```
@@ -139,6 +144,7 @@ cvt-help                              # Ayuda rápida
 | **WebM** | VP9/Opus para web                | ✅ AV1 NVENC\* |
 | **AVI**  | MPEG-4/MP3, legacy               | ❌ CPU only    |
 | **MKV**  | H.264/HEVC/AAC, alta calidad     | ✅ HEVC NVENC  |
+| **MP3**  | Audio únicamente (transcripción) | ❌ CPU only    |
 
 _\*AV1 NVENC requiere GPUs Ada Lovelace o newer_
 
@@ -200,6 +206,8 @@ video-converter-flask/
 
 - **[USAGE.md](./USAGE.md)** - Guía detallada de uso
 - **[PROFILE-INTEGRATION.md](./PROFILE-INTEGRATION.md)** - Integración con PowerShell
+- **[AUDIO-EXTRACTION.md](./AUDIO-EXTRACTION.md)** - Extracción de audio MP3 para IA
+- **[TIMING-FEATURE.md](./TIMING-FEATURE.md)** - Medición de tiempo de conversión
 - **[SYNTAX-EXAMPLES.ps1](./SYNTAX-EXAMPLES.ps1)** - Ejemplos de sintaxis
 
 ## 🛠️ Desarrollo

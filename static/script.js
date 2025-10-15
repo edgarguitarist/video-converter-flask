@@ -4,12 +4,26 @@ const fileInput = document.getElementById('file-input');
 const filenameEl = document.getElementById('filename');
 const browseBtn = document.getElementById('browse-btn');
 const form = document.getElementById('convert-form');
+const formatSelect = document.getElementById('format');
+const gpuCheckbox = document.getElementById('gpu');
 
 const progressArea = document.getElementById('progress-area');
 const bar = document.getElementById('bar');
 const barPct = document.getElementById('bar-pct');
 const logsEl = document.getElementById('logs');
 const downloadLink = document.getElementById('download-link');
+
+// Manejar cambio de formato para deshabilitar GPU en MP3
+formatSelect.addEventListener('change', () => {
+  if (formatSelect.value === 'mp3') {
+    gpuCheckbox.checked = false;
+    gpuCheckbox.disabled = true;
+    gpuCheckbox.parentElement.style.opacity = '0.5';
+  } else {
+    gpuCheckbox.disabled = false;
+    gpuCheckbox.parentElement.style.opacity = '1';
+  }
+});
 
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
   dropzone.addEventListener(eventName, (e) => {

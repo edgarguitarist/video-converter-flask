@@ -27,6 +27,7 @@ function Convert-Video {
         [switch]$WebM,
         [switch]$AVI,
         [switch]$MKV,
+        [switch]$MP3,
         [switch]$GPU,
         [switch]$Web,
         [switch]$Help
@@ -64,6 +65,7 @@ function Convert-Video {
     if ($WebM) { $Format = "webm"; $FormatCount++ }
     if ($AVI) { $Format = "avi"; $FormatCount++ }
     if ($MKV) { $Format = "mkv"; $FormatCount++ }
+    if ($MP3) { $Format = "mp3"; $FormatCount++ }
     
     # Validar que solo se especificó un formato
     if ($FormatCount -gt 1) {
@@ -119,8 +121,9 @@ function Convert-Video {
         else {
             # Modo conversión CLI
             if (-not $Format) {
-                Write-Host "❌ ERROR: Debe especificar un formato (-MP4, -WebM, -AVI, -MKV)" -ForegroundColor Red
+                Write-Host "❌ ERROR: Debe especificar un formato (-MP4, -WebM, -AVI, -MKV, -MP3)" -ForegroundColor Red
                 Write-Host "💡 Ejemplo: Convert-Video -MP4 'video.mov'" -ForegroundColor Yellow
+                Write-Host "💡 Ejemplo: Convert-Video -MP3 'video.mp4' # Extraer audio" -ForegroundColor Yellow
                 return
             }
             
@@ -142,7 +145,10 @@ function Convert-Video {
             }
             
             Write-Host "🔄 Convirtiendo a $($Format.ToUpper())..." -ForegroundColor Blue
-            if ($GPU) {
+            if ($Format -eq "mp3") {
+                Write-Host "🎵 Extrayendo audio..." -ForegroundColor Magenta
+            }
+            elseif ($GPU) {
                 Write-Host "⚡ Usando aceleración GPU" -ForegroundColor Cyan
             }
         }
@@ -216,6 +222,16 @@ function cvt-mkv {
     Convert-Video -MKV -InputPath $InputPath -OutputPath $OutputPath -GPU:$GPU
 }
 
+function cvt-mp3 {
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [string]$InputPath,
+        [Parameter(Position = 1)]
+        [string]$OutputPath
+    )
+    Convert-Video -MP3 -InputPath $InputPath -OutputPath $OutputPath
+}
+
 function cvt-web {
     Convert-Video -Web
 }
@@ -229,6 +245,7 @@ function cvt-help {
     Write-Host "  Convert-Video -WebM 'archivo.mp4' -GPU     - Convertir a WebM con GPU" -ForegroundColor White
     Write-Host "  Convert-Video -AVI 'archivo.mkv'           - Convertir a AVI" -ForegroundColor White
     Write-Host "  Convert-Video -MKV 'archivo.mp4' -GPU      - Convertir a MKV con GPU" -ForegroundColor White
+    Write-Host "  Convert-Video -MP3 'archivo.mp4'           - Extraer audio a MP3" -ForegroundColor White
     Write-Host "  Convert-Video -Web                         - Iniciar servidor web" -ForegroundColor White
     Write-Host "  Convert-Video -Help                        - Mostrar ayuda completa" -ForegroundColor White
     Write-Host ""
@@ -237,20 +254,26 @@ function cvt-help {
     Write-Host "  cvt-webm 'video.mp4' -GPU                  - Convertir a WebM" -ForegroundColor White
     Write-Host "  cvt-avi 'video.mkv'                        - Convertir a AVI" -ForegroundColor White
     Write-Host "  cvt-mkv 'video.avi' 'salida.mkv'           - Convertir a MKV" -ForegroundColor White
+    Write-Host "  cvt-mp3 'video.mp4'                        - Extraer audio a MP3" -ForegroundColor White
     Write-Host "  cvt-web                                     - Iniciar servidor web" -ForegroundColor White
     Write-Host "  cvt-help                                    - Mostrar esta ayuda" -ForegroundColor White
     Write-Host ""
     Write-Host "💡 Ejemplos de uso:" -ForegroundColor Yellow
     Write-Host "  cvt-mp4 'video.mov'" -ForegroundColor Gray
+    Write-Host "  cvt-mp3 'conferencia.mp4'" -ForegroundColor Gray
     Write-Host "  Convert-Video -WebM 'video.mp4' -GPU" -ForegroundColor Gray
-    Write-Host "  Convert-Video -MKV 'video.avi' 'C:\salida\video.mkv'" -ForegroundColor Gray
+    Write-Host "  Convert-Video -MP3 'video.avi' 'C:\audio\audio.mp3'" -ForegroundColor Gray
     Write-Host "  Convert-Video -Help" -ForegroundColor Gray
     Write-Host "  cvt-web" -ForegroundColor Gray
     Write-Host ""
     Write-Host "⚡ Switches disponibles:" -ForegroundColor Yellow
-    Write-Host "  -GPU     : Usar aceleración GPU (NVENC)" -ForegroundColor White
+    Write-Host "  -GPU     : Usar aceleración GPU (NVENC) - no aplica para MP3" -ForegroundColor White
     Write-Host "  -Web     : Iniciar servidor web" -ForegroundColor White
     Write-Host "  -Help    : Mostrar ayuda del script Python" -ForegroundColor White
+    Write-Host ""
+    Write-Host "🎵 Extracción de audio:" -ForegroundColor Yellow
+    Write-Host "  La extracción a MP3 es ideal para transcripción con IA" -ForegroundColor White
+    Write-Host "  Bitrate: 192 kbps, Sample rate: 44.1 kHz" -ForegroundColor White
 }
 
 # Alias adicionales
