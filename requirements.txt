@@ -3,3 +3,4 @@ Werkzeug==3.0.3
 openai-whisper==20240930
 torch==2.9.0
 torchaudio==2.9.0
+deep-translator==1.11.4

@@ -34,7 +34,9 @@ function Convert-Video {
         [switch]$Help,
         
         [ValidateSet('tiny', 'base', 'small', 'medium', 'large')]
-        [string]$Model = 'base'
+        [string]$Model = 'base',
+        
+        [string]$Translate
     )
     
     # Configuración de rutas del proyecto
@@ -154,6 +156,12 @@ function Convert-Video {
             if ($Format -eq "srt") {
                 $PythonArgs += "--model"
                 $PythonArgs += $Model
+                
+                # Añadir traducción si se especifica
+                if ($Translate) {
+                    $PythonArgs += "--translate"
+                    $PythonArgs += $Translate
+                }
             }
             
             Write-Host "🔄 Convirtiendo a $($Format.ToUpper())..." -ForegroundColor Blue
@@ -161,7 +169,13 @@ function Convert-Video {
                 Write-Host "🎵 Extrayendo audio..." -ForegroundColor Magenta
             }
             elseif ($Format -eq "srt") {
-                Write-Host "🤖 Generando subtítulos con IA (modelo: $Model)..." -ForegroundColor Magenta
+                if ($Translate) {
+                    Write-Host "🤖 Generando subtítulos con IA (modelo: $Model)..." -ForegroundColor Magenta
+                    Write-Host "🌍 Traduciendo a: $Translate" -ForegroundColor Cyan
+                }
+                else {
+                    Write-Host "🤖 Generando subtítulos con IA (modelo: $Model)..." -ForegroundColor Magenta
+                }
             }
             elseif ($GPU) {
                 Write-Host "⚡ Usando aceleración GPU" -ForegroundColor Cyan
@@ -254,9 +268,10 @@ function cvt-srt {
         [Parameter(Position = 1)]
         [string]$OutputPath,
         [ValidateSet('tiny', 'base', 'small', 'medium', 'large')]
-        [string]$Model = 'base'
+        [string]$Model = 'base',
+        [string]$Translate
     )
-    Convert-Video -SRT -InputPath $InputPath -OutputPath $OutputPath -Model $Model
+    Convert-Video -SRT -InputPath $InputPath -OutputPath $OutputPath -Model $Model -Translate $Translate
 }
 
 function cvt-web {
@@ -274,6 +289,7 @@ function cvt-help {
     Write-Host "  Convert-Video -MKV 'archivo.mp4' -GPU      - Convertir a MKV con GPU" -ForegroundColor White
     Write-Host "  Convert-Video -MP3 'archivo.mp4'           - Extraer audio a MP3" -ForegroundColor White
     Write-Host "  Convert-Video -SRT 'archivo.mp4'           - Generar subtítulos con IA" -ForegroundColor White
+    Write-Host "  Convert-Video -SRT 'archivo.mp4' -Translate english - Generar + traducir subtítulos" -ForegroundColor White
     Write-Host "  Convert-Video -Web                         - Iniciar servidor web" -ForegroundColor White
     Write-Host "  Convert-Video -Help                        - Mostrar ayuda completa" -ForegroundColor White
     Write-Host ""
@@ -284,6 +300,7 @@ function cvt-help {
     Write-Host "  cvt-mkv 'video.avi' 'salida.mkv'           - Convertir a MKV" -ForegroundColor White
     Write-Host "  cvt-mp3 'video.mp4'                        - Extraer audio a MP3" -ForegroundColor White
     Write-Host "  cvt-srt 'video.mp4'                        - Generar subtítulos SRT" -ForegroundColor White
+    Write-Host "  cvt-srt 'video.mp4' -Translate english     - SRT original + traducido" -ForegroundColor White
     Write-Host "  cvt-web                                     - Iniciar servidor web" -ForegroundColor White
     Write-Host "  cvt-help                                    - Mostrar esta ayuda" -ForegroundColor White
     Write-Host ""
@@ -292,16 +309,19 @@ function cvt-help {
     Write-Host "  cvt-mp3 'conferencia.mp4'" -ForegroundColor Gray
     Write-Host "  cvt-srt 'conferencia.mp4'" -ForegroundColor Gray
     Write-Host "  cvt-srt 'video.mkv' -Model medium" -ForegroundColor Gray
+    Write-Host "  cvt-srt 'video_espanol.mp4' -Translate english" -ForegroundColor Gray
+    Write-Host "  cvt-srt 'english_video.mp4' -Translate spanish -Model large" -ForegroundColor Gray
     Write-Host "  Convert-Video -WebM 'video.mp4' -GPU" -ForegroundColor Gray
-    Write-Host "  Convert-Video -SRT 'video.avi' 'C:\subtitulos\video.srt' -Model large" -ForegroundColor Gray
+    Write-Host "  Convert-Video -SRT 'video.avi' -Translate french -Model medium" -ForegroundColor Gray
     Write-Host "  Convert-Video -Help" -ForegroundColor Gray
     Write-Host "  cvt-web" -ForegroundColor Gray
     Write-Host ""
     Write-Host "⚡ Switches disponibles:" -ForegroundColor Yellow
-    Write-Host "  -GPU     : Usar aceleración GPU (NVENC) - no aplica para MP3/SRT" -ForegroundColor White
-    Write-Host "  -Model   : Modelo Whisper (tiny/base/small/medium/large) - solo para SRT" -ForegroundColor White
-    Write-Host "  -Web     : Iniciar servidor web" -ForegroundColor White
-    Write-Host "  -Help    : Mostrar ayuda del script Python" -ForegroundColor White
+    Write-Host "  -GPU      : Usar aceleración GPU (NVENC) - no aplica para MP3/SRT" -ForegroundColor White
+    Write-Host "  -Model    : Modelo Whisper (tiny/base/small/medium/large) - solo para SRT" -ForegroundColor White
+    Write-Host "  -Translate: Idioma para traducir subtítulos (english/spanish/french/etc.)" -ForegroundColor White
+    Write-Host "  -Web      : Iniciar servidor web" -ForegroundColor White
+    Write-Host "  -Help     : Mostrar ayuda del script Python" -ForegroundColor White
     Write-Host ""
     Write-Host "🤖 Modelos Whisper disponibles:" -ForegroundColor Yellow
     Write-Host "  tiny     : Más rápido, menos preciso (~39 MB)" -ForegroundColor White
@@ -309,6 +329,11 @@ function cvt-help {
     Write-Host "  small    : Mejor calidad (~244 MB)" -ForegroundColor White
     Write-Host "  medium   : Alta calidad (~769 MB)" -ForegroundColor White
     Write-Host "  large    : Máxima calidad (~1550 MB)" -ForegroundColor White
+    Write-Host ""
+    Write-Host "🌍 Idiomas para traducción:" -ForegroundColor Yellow
+    Write-Host "  english, spanish, french, german, italian, portuguese" -ForegroundColor White
+    Write-Host "  russian, japanese, korean, chinese, dutch, arabic" -ForegroundColor White
+    Write-Host "  Y muchos más idiomas soportados por Google Translate" -ForegroundColor White
     Write-Host ""
     Write-Host "🎵 Extracción de audio:" -ForegroundColor Yellow
     Write-Host "  La extracción a MP3 es ideal para transcripción con IA" -ForegroundColor White

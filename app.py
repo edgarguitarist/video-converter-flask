@@ -13,6 +13,14 @@ except ImportError:
     WHISPER_AVAILABLE = False
     whisper = None
 
+# Importación condicional de deep-translator
+try:
+    from deep_translator import GoogleTranslator
+    TRANSLATOR_AVAILABLE = True
+except ImportError:
+    TRANSLATOR_AVAILABLE = False
+    GoogleTranslator = None
+
 ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.mkv', '.avi', '.wmv', '.flv', '.webm', '.m4v'}
 MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # 2GB
 
@@ -89,6 +97,135 @@ def transcribe_audio_to_srt(audio_path: str, output_srt_path: str, model_size: s
         
     except Exception as e:
         print(f"❌ ERROR durante la transcripción: {e}")
+        return False
+
+def translate_text(text: str, target_language: str, source_language: str = 'auto') -> str:
+    """
+    Traduce texto usando Google Translator
+    """
+    if not TRANSLATOR_AVAILABLE:
+        print("❌ ERROR: deep-translator no está instalado. Instala con: pip install deep-translator")
+        return text
+    
+    try:
+        # Mapeo de códigos de idioma comunes
+        language_map = {
+            'spanish': 'es', 'español': 'es', 'es': 'es',
+            'english': 'en', 'inglés': 'en', 'ingles': 'en', 'en': 'en',
+            'french': 'fr', 'francés': 'fr', 'frances': 'fr', 'fr': 'fr',
+            'german': 'de', 'alemán': 'de', 'aleman': 'de', 'de': 'de',
+            'italian': 'it', 'italiano': 'it', 'it': 'it',
+            'portuguese': 'pt', 'portugués': 'pt', 'portugues': 'pt', 'pt': 'pt',
+            'russian': 'ru', 'ruso': 'ru', 'ru': 'ru',
+            'japanese': 'ja', 'japonés': 'ja', 'japones': 'ja', 'ja': 'ja',
+            'korean': 'ko', 'coreano': 'ko', 'ko': 'ko',
+            'chinese': 'zh', 'chino': 'zh', 'zh': 'zh',
+            'dutch': 'nl', 'holandés': 'nl', 'holandes': 'nl', 'nl': 'nl',
+            'arabic': 'ar', 'árabe': 'ar', 'arabe': 'ar', 'ar': 'ar'
+        }
+        
+        # Convertir idioma objetivo a código
+        target_lang_code = language_map.get(target_language.lower(), target_language.lower())
+        source_lang_code = language_map.get(source_language.lower(), source_language.lower()) if source_language != 'auto' else 'auto'
+        
+        # Crear traductor
+        translator = GoogleTranslator(source=source_lang_code, target=target_lang_code)
+        
+        # Traducir texto en chunks para evitar límites
+        max_length = 4000  # Límite conservador
+        if len(text) <= max_length:
+            return translator.translate(text)
+        else:
+            # Dividir texto en chunks más pequeños
+            chunks = [text[i:i+max_length] for i in range(0, len(text), max_length)]
+            translated_chunks = []
+            for chunk in chunks:
+                translated_chunks.append(translator.translate(chunk))
+            return ' '.join(translated_chunks)
+            
+    except Exception as e:
+        print(f"⚠️  Error al traducir: {e}")
+        return text  # Retornar texto original si hay error
+
+def transcribe_and_translate_to_srt(audio_path: str, output_srt_path: str, target_language: str, model_size: str = "base") -> bool:
+    """
+    Transcribe audio usando Whisper y genera dos archivos SRT: original y traducido
+    """
+    if not WHISPER_AVAILABLE:
+        print("❌ ERROR: Whisper no está instalado. Instala con: pip install openai-whisper")
+        return False
+    
+    if not TRANSLATOR_AVAILABLE:
+        print("❌ ERROR: deep-translator no está instalado. Instala con: pip install deep-translator")
+        return False
+    
+    if not os.path.exists(audio_path):
+        print(f"❌ ERROR: Archivo de audio no encontrado: {audio_path}")
+        return False
+    
+    try:
+        print(f"🤖 Cargando modelo Whisper ({model_size})...")
+        model = whisper.load_model(model_size)
+        
+        print(f"🎵 Transcribiendo audio: {audio_path}")
+        result = model.transcribe(audio_path, word_timestamps=True)
+        
+        # Crear rutas para ambos archivos SRT
+        original_srt_path = output_srt_path
+        translated_srt_path = output_srt_path.replace('.srt', f'_{target_language}.srt')
+        
+        print(f"📄 Generando archivo SRT original: {original_srt_path}")
+        print(f"🌍 Generando archivo SRT traducido: {translated_srt_path}")
+        
+        # Crear directorio de salida si no existe
+        os.makedirs(os.path.dirname(output_srt_path), exist_ok=True)
+        
+        # Generar archivo SRT original
+        with open(original_srt_path, 'w', encoding='utf-8') as f_orig:
+            subtitle_index = 1
+            
+            for segment in result['segments']:
+                start_time = seconds_to_srt_time(segment['start'])
+                end_time = seconds_to_srt_time(segment['end'])
+                text = segment['text'].strip()
+                
+                f_orig.write(f"{subtitle_index}\n")
+                f_orig.write(f"{start_time} --> {end_time}\n")
+                f_orig.write(f"{text}\n\n")
+                
+                subtitle_index += 1
+        
+        print(f"✅ Archivo SRT original generado: {original_srt_path}")
+        
+        # Generar archivo SRT traducido
+        print(f"🌍 Traduciendo subtítulos a {target_language}...")
+        with open(translated_srt_path, 'w', encoding='utf-8') as f_trans:
+            subtitle_index = 1
+            
+            for segment in result['segments']:
+                start_time = seconds_to_srt_time(segment['start'])
+                end_time = seconds_to_srt_time(segment['end'])
+                original_text = segment['text'].strip()
+                
+                # Traducir el texto
+                translated_text = translate_text(original_text, target_language)
+                
+                f_trans.write(f"{subtitle_index}\n")
+                f_trans.write(f"{start_time} --> {end_time}\n")
+                f_trans.write(f"{translated_text}\n\n")
+                
+                subtitle_index += 1
+                
+                # Mostrar progreso cada 10 subtítulos
+                if subtitle_index % 10 == 0:
+                    print(f"🔄 Traduciendo... {subtitle_index} subtítulos procesados")
+        
+        print(f"✅ Archivo SRT traducido generado: {translated_srt_path}")
+        print(f"🎉 Proceso completado: 2 archivos SRT creados")
+        return True
+        
+    except Exception as e:
+        print(f"❌ ERROR durante la transcripción y traducción: {e}")
         return False
 
 def get_codec_args(target_format: str, use_gpu: bool = False) -> tuple:
@@ -377,6 +514,8 @@ def main():
     parser.add_argument('--gpu', action='store_true', help='Usar aceleración GPU (NVENC) - no aplica para MP3/SRT')
     parser.add_argument('--model', default='base', choices=['tiny', 'base', 'small', 'medium', 'large'], 
                         help='Modelo Whisper para transcripción (tiny/base/small/medium/large). Default: base')
+    parser.add_argument('--translate', metavar='LANGUAGE', 
+                        help='Idioma para traducir subtítulos (ej: english, spanish, french, german, etc.). Genera SRT original + traducido')
     parser.add_argument('--web', action='store_true', help='Iniciar servidor web (modo por defecto)')
     
     args = parser.parse_args()
@@ -429,10 +568,13 @@ def main():
             print(f"🎬 Procesando video para subtítulos: {input_file}")
             print(f"📄 Archivo SRT de salida: {output_path}")
             print(f"🤖 Modelo Whisper: {args.model}")
+            if args.translate:
+                print(f"🌍 Idioma de traducción: {args.translate}")
+                print(f"📋 Se generarán 2 archivos: original + traducido")
             print("-" * 60)
             
             # Paso 1: Extraer audio a MP3
-            print("📤 Paso 1/2: Extrayendo audio...")
+            print("📤 Paso 1/3: Extrayendo audio..." if args.translate else "📤 Paso 1/2: Extrayendo audio...")
             use_gpu = args.gpu and False  # GPU no aplica para audio
             success = convert_video_cli(input_file, temp_mp3_path, 'mp3', use_gpu)
             
@@ -440,10 +582,17 @@ def main():
                 print("❌ Error extrayendo audio")
                 sys.exit(1)
             
-            # Paso 2: Transcribir con Whisper
-            print("\n🤖 Paso 2/2: Transcribiendo con IA...")
+            # Paso 2: Transcribir con Whisper (y traducir si se especifica)
             start_time = time.time()
-            success = transcribe_audio_to_srt(temp_mp3_path, output_path, args.model)
+            
+            if args.translate:
+                print(f"\n🤖 Paso 2/3: Transcribiendo con IA...")
+                print(f"🌍 Paso 3/3: Traduciendo a {args.translate}...")
+                success = transcribe_and_translate_to_srt(temp_mp3_path, output_path, args.translate, args.model)
+            else:
+                print("\n🤖 Paso 2/2: Transcribiendo con IA...")
+                success = transcribe_audio_to_srt(temp_mp3_path, output_path, args.model)
+                
             end_time = time.time()
             
             # Limpiar archivo temporal MP3
@@ -460,8 +609,15 @@ def main():
             time_str = f"{minutes:02d}:{seconds:05.2f}" if minutes > 0 else f"{seconds:.2f}s"
             
             if success:
-                print(f"✅ Subtítulos completados: {output_path}")
-                print(f"⏱️  Tiempo de transcripción: {time_str}")
+                if args.translate:
+                    original_srt = output_path
+                    translated_srt = output_path.replace('.srt', f'_{args.translate}.srt')
+                    print(f"✅ Transcripción completada: {original_srt}")
+                    print(f"✅ Traducción completada: {translated_srt}")
+                    print(f"🎉 2 archivos SRT generados exitosamente")
+                else:
+                    print(f"✅ Subtítulos completados: {output_path}")
+                print(f"⏱️  Tiempo de procesamiento: {time_str}")
             else:
                 print(f"❌ Error en la transcripción")
                 print(f"⏱️  Tiempo transcurrido: {time_str}")
