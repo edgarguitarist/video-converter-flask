@@ -147,14 +147,23 @@ function Convert-Video {
             }
         }
         
+        # Medir tiempo de ejecución
+        $StartTime = Get-Date
+        
         # Ejecutar conversión
         & $VenvPython $AppScript @PythonArgs
         
+        # Calcular tiempo transcurrido
+        $EndTime = Get-Date
+        $Duration = $EndTime - $StartTime
+        
         if ($LASTEXITCODE -eq 0) {
             Write-Host "✅ Operación completada exitosamente" -ForegroundColor Green
+            Write-Host "⏱️  Tiempo transcurrido: $($Duration.ToString('mm\:ss\.ff'))" -ForegroundColor Cyan
         }
         else {
             Write-Host "❌ Error en la operación (código: $LASTEXITCODE)" -ForegroundColor Red
+            Write-Host "⏱️  Tiempo transcurrido: $($Duration.ToString('mm\:ss\.ff'))" -ForegroundColor Yellow
         }
     }
     finally {

@@ -103,6 +103,9 @@ def convert_video_cli(input_path: str, output_path: str, target_format: str, use
     # Ejecutar ffmpeg
     cmd = ['ffmpeg', '-hide_banner', '-y', '-i', input_path, *codec_args, output_path]
     
+    # Medir tiempo de ejecución
+    start_time = time.time()
+    
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
         time_re = re.compile(r'time=(\d+):(\d+):(\d+(\.\d+)?)')
@@ -121,11 +124,22 @@ def convert_video_cli(input_path: str, output_path: str, target_format: str, use
         ret = proc.wait()
         print()  # Nueva línea después del progreso
         
+        # Calcular tiempo transcurrido
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        
+        # Formatear tiempo en formato legible
+        minutes = int(elapsed_time // 60)
+        seconds = elapsed_time % 60
+        time_str = f"{minutes:02d}:{seconds:05.2f}" if minutes > 0 else f"{seconds:.2f}s"
+        
         if ret == 0:
             print(f"✓ Conversión completada exitosamente: {output_path}")
+            print(f"⏱️  Tiempo transcurrido: {time_str}")
             return True
         else:
             print(f"✗ Error en la conversión. ffmpeg terminó con código {ret}")
+            print(f"⏱️  Tiempo transcurrido: {time_str}")
             return False
             
     except Exception as e:

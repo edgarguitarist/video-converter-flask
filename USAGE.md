@@ -270,6 +270,13 @@ ffmpeg -encoders | findstr nvenc
 
 - Output completo de ffmpeg en terminal
 - Progreso en tiempo real con porcentaje
+- **Tiempo de conversión** mostrado al finalizar
+
+#### Modo PowerShell
+
+- Información de entrada y salida detallada
+- Estado de GPU y encoder utilizado
+- **Tiempo transcurrido** al completar operación
 
 ## 📊 Rendimiento
 

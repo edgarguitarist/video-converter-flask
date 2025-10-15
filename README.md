@@ -8,6 +8,7 @@ Aplicación web y herramienta de línea de comandos para convertir videos usando
 - 💻 **Línea de Comandos**: Scripts PowerShell para conversión rápida
 - ⚡ **Aceleración GPU**: Soporte NVENC para GPUs NVIDIA
 - 📊 **Progreso en Tiempo Real**: Barras de progreso y logs detallados
+- ⏱️ **Medición de Tiempo**: Duración de conversión en CLI y PowerShell
 - 🔄 **Múltiples Formatos**: MP4, WebM, AVI, MKV
 - 🎯 **Integración PowerShell**: Funciones globales para tu perfil
 
